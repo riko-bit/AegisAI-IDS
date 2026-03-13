@@ -1,4 +1,4 @@
-# 🛡️ AI-Based Intrusion Detection System (AI-IDS)
+# 🛡️ AegisAI - An AI-Based Intrusion Detection System (AI-IDS)
 
 ![Python](https://img.shields.io/badge/Python-3.10-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-Deep%20Learning-red)
@@ -54,4 +54,4 @@ CICIDS2017 Dataset https://www.unb.ca/cic/datasets/ids-2017.html
 
 ## Author
 
-AI-Based Intrusion Detection System Project
+Riko
