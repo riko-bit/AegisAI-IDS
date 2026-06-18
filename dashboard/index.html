@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"> <!-- 🔥 FIX encoding -->
+
+    <title>AI IDS SOC Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            background: #020617;
+            color: white;
+            font-family: Arial;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #38bdf8;
+        }
+
+        .section {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .card {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        .metric {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .low { color: #22c55e; }
+        .medium { color: #facc15; }
+        .high { color: #ef4444; }
+
+        #alerts {
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        /* 🔥 FIX graph size */
+        .chart-container {
+            width: 400px;
+            height: 300px;
+            margin: auto;
+        }
+
+        canvas {
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>🛡️ AI IDS - SOC Dashboard</h1>
+<p style="color:#22c55e;">🟢 System Active</p>
+
+<!-- 🔥 NEW: SYSTEM INFO -->
+<div class="section">
+    <h2>📌 System Overview</h2>
+    <p>
+        This AI-based Intrusion Detection System (IDS) monitors real-time network traffic,
+        detects anomalies using machine learning models, and assigns risk levels based on behavior.
+    </p>
+
+    <h3>⚙️ Tech Stack</h3>
+    <ul>
+        <li>Backend: FastAPI (Python)</li>
+        <li>ML Models: Autoencoder + Random Forest</li>
+        <li>Realtime Capture: PyShark</li>
+        <li>Frontend: HTML + Chart.js</li>
+    </ul>
+
+    <h3>🧠 Detection Logic</h3>
+    <ul>
+        <li>Traffic is captured in real-time</li>
+        <li>Features are extracted from packets</li>
+        <li>Autoencoder calculates anomaly score</li>
+        <li>Classifier predicts attack type</li>
+        <li>Risk score is computed and alerts are generated</li>
+    </ul>
+</div>
+
+<!-- KPI -->
+<div class="grid">
+    <div class="card">
+        <div>Total Alerts</div>
+        <div id="total" class="metric">0</div>
+    </div>
+    <div class="card">
+        <div>High Risk</div>
+        <div id="high" class="metric high">0</div>
+    </div>
+    <div class="card">
+        <div>Medium Risk</div>
+        <div id="medium" class="metric medium">0</div>
+    </div>
+</div>
+
+<br>
+
+<!-- 🔥 FIXED CHART SIZE -->
+<div class="grid">
+    <div class="chart-container">
+        <canvas id="riskChart"></canvas>
+    </div>
+    <div class="chart-container">
+        <canvas id="timelineChart"></canvas>
+    </div>
+</div>
+
+<!-- Alerts -->
+<h2>🚨 Live Alerts</h2>
+<div id="alerts"></div>
+
+<script>
+let seen = new Set();
+
+const riskChart = new Chart(document.getElementById("riskChart"), {
+    type: 'pie',
+    data: {
+        labels: ["HIGH", "MEDIUM"],
+        datasets: [{ data: [0, 0] }]
+    }
+});
+
+const timelineChart = new Chart(document.getElementById("timelineChart"), {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{
+            label: "Total Alerts",
+            data: []
+        }]
+    }
+});
+
+async function fetchAlerts() {
+    try {
+        const res = await fetch("http://127.0.0.1:8000/alerts");
+        const data = await res.json();
+
+        const container = document.getElementById("alerts");
+
+        let stats = {
+            total: data.length,
+            high: 0,
+            medium: 0
+        };
+
+        data.forEach(alert => {
+            let parsed = alert.data;
+
+            if (typeof parsed === "string") {
+                try { parsed = JSON.parse(parsed); } catch { return; }
+            }
+
+            if (!parsed) return;
+
+            if (parsed.risk_level === "HIGH") stats.high++;
+            if (parsed.risk_level === "MEDIUM") stats.medium++;
+        });
+
+        document.getElementById("total").innerText = stats.total;
+        document.getElementById("high").innerText = stats.high;
+        document.getElementById("medium").innerText = stats.medium;
+
+        riskChart.data.datasets[0].data = [stats.high, stats.medium];
+        riskChart.update();
+
+        data.forEach(alert => {
+            const id = alert.timestamp;
+            if (seen.has(id)) return;
+            seen.add(id);
+
+            let parsed = alert.data;
+
+            if (typeof parsed === "string") {
+                try { parsed = JSON.parse(parsed); } catch { return; }
+            }
+
+            if (!parsed) return;
+
+            const confidence = parsed.confidence ?? 0;
+            const anomaly = parsed.anomaly_score ?? 0;
+
+            const card = document.createElement("div");
+            card.className = "card";
+
+            card.innerHTML = `
+                <b>${parsed.risk_level} ALERT</b><br>
+                Prediction: ${parsed.prediction}<br>
+                Confidence: ${confidence.toFixed(2)}<br>
+                Anomaly: ${anomaly.toFixed(4)}<br>
+                Features: ${parsed.top_features}
+            `;
+
+            container.prepend(card);
+
+            if (container.children.length > 50) {
+                container.removeChild(container.lastChild);
+            }
+        });
+
+        timelineChart.data.labels.push(new Date().toLocaleTimeString());
+        timelineChart.data.datasets[0].data.push(stats.total);
+
+        if (timelineChart.data.labels.length > 20) {
+            timelineChart.data.labels.shift();
+            timelineChart.data.datasets[0].data.shift();
+        }
+
+        timelineChart.update();
+
+    } catch (err) {
+        console.error("Dashboard Error:", err);
+    }
+}
+
+setInterval(fetchAlerts, 2000);
+fetchAlerts();
+</script>
+
+</body>
+</html>
