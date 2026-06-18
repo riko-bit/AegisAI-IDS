@@ -1,0 +1,10 @@
+pandas
+numpy
+scikit-learn
+torch
+fastapi
+uvicorn
+pyshark
+scapy
+joblib
+requests
